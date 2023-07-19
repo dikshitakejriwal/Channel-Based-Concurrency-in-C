@@ -165,6 +165,24 @@ enum channel_status channel_close(channel_t* channel)
 {
     /* IMPLEMENT THIS */
     //clears out everything that is happening in the channel  - any threads that are in middle of send or receive in that channel those will be stopped
+    
+    //lock the mutex
+    pthread_mutex_lock(&channel->mutex);
+
+    //check if channel is already closed
+    if (channel->is_closed) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CLOSED_ERROR;
+
+    //mark channel as closed
+    channel->is_closed = true;
+
+    //wake up all the threads waiting on cond_read and cond_write
+    pthread_cond_broadcast(&channel->cond_read);
+    pthread_cond_broadcast(&channel->cond_write);
+
+    pthread_mutex_unlock(&channel->mutex); //unlock the mutex
+
     return SUCCESS;
 }
 
