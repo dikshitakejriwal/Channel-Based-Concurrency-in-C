@@ -48,6 +48,10 @@ enum channel_status channel_send(channel_t *channel, void* data)
     //else add in buffer and check if it full or not - if it throws an error then the buffer is full
     while (buffer_add(channel->buffer, data) == BUFFER_ERROR){
         //wait until the buffer is not full anymore - signaled by cond_read
+        if (channel->is_closed) {
+            pthread_mutex_unlock(&channel->mutex);
+            return CLOSED_ERROR;
+        }
         pthread_cond_wait(&channel->cond_write, &channel->mutex);
     }
 
@@ -78,6 +82,10 @@ enum channel_status channel_receive(channel_t* channel, void** data)
     //remove data from the buffer - check if the buffer is empty - if it is wait until data is added
     while (buffer_remove(channel->buffer, data) == BUFFER_ERROR) {
         //wait until the buffer is not empty anymore - signaled by cond_write
+        if (channel->is_closed) {
+            pthread_mutex_unlock(&channel->mutex);
+            return CLOSED_ERROR;
+        }
         pthread_cond_wait(&channel->cond_read, &channel->mutex);
     }
 
@@ -167,6 +175,9 @@ enum channel_status channel_close(channel_t* channel)
     //clears out everything that is happening in the channel  - any threads that are in middle of send or receive in that channel those will be stopped
     
     //lock the mutex
+    if(!channel){
+        return GEN_ERROR;
+    }
     pthread_mutex_lock(&channel->mutex);
 
     //check if channel is already closed
@@ -194,7 +205,8 @@ enum channel_status channel_close(channel_t* channel)
 enum channel_status channel_destroy(channel_t* channel)
 {
     /* IMPLEMENT THIS */
-    return SUCCESS;
+    
+
 }
 
 // Takes an array of channels (channel_list) of type select_t and the array length (channel_count) as inputs
