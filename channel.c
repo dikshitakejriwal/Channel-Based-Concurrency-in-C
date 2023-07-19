@@ -105,9 +105,6 @@ enum channel_status channel_non_blocking_send(channel_t* channel, void* data)
 {
     /* IMPLEMENT THIS */
     // if channel doesn't exist return GEN_ERROR
-    if(!channel){
-        return GEN_ERROR;
-    }
 
     //lock the mutex
     pthread_mutex_lock(&channel->mutex);
@@ -141,9 +138,6 @@ enum channel_status channel_non_blocking_receive(channel_t* channel, void** data
 
     // receive wont block if there are no messages in the buffer and buffer is empty instead just say the buffer is empty
 
-    if(!channel){
-        return GEN_ERROR;
-    }
     //lock the mutex
     pthread_mutex_lock(&channel->mutex);
 
@@ -153,7 +147,7 @@ enum channel_status channel_non_blocking_receive(channel_t* channel, void** data
     }
 
 
-    if (buffer_remove(channel->buffer, data) == BUFFER_ERROR) {
+    if (buffer_remove(channel->buffer, data) == BUFFER_ERROR){
         pthread_mutex_unlock(&channel->mutex);
         return CHANNEL_EMPTY;
     }
@@ -175,9 +169,6 @@ enum channel_status channel_close(channel_t* channel)
     //clears out everything that is happening in the channel  - any threads that are in middle of send or receive in that channel those will be stopped
     
     //lock the mutex
-    if(!channel){
-        return GEN_ERROR;
-    }
     pthread_mutex_lock(&channel->mutex);
 
     //check if channel is already closed
@@ -205,8 +196,28 @@ enum channel_status channel_close(channel_t* channel)
 enum channel_status channel_destroy(channel_t* channel)
 {
     /* IMPLEMENT THIS */
-    
+    pthread_mutex_lock(&channel->mutex);
 
+    //DESTROY_ERROR if channel_destroy is called on an open channel
+    if (!channel->is_closed) {
+        pthread_mutex_unlock(&channel->mutex);
+        return DESTROY_ERROR;
+    }
+
+    //free buffer allocated to the channel
+    buffer_free(channel->buffer);
+
+    //unlock mutex
+    pthread_mutex_unlock(&channel->mutex); 
+
+    //destroy mutex and cond variables
+    pthread_mutex_destroy(&channel->mutex);
+    pthread_cond_destroy(&channel->cond_read);
+    pthread_cond_destroy(&channel->cond_write);
+
+    free(channel);
+
+    return SUCCESS;
 }
 
 // Takes an array of channels (channel_list) of type select_t and the array length (channel_count) as inputs
