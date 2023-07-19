@@ -26,8 +26,15 @@ typedef struct {
     // DO NOT REMOVE buffer (OR CHANGE ITS NAME) FROM THE STRUCT
     // YOU MUST USE buffer TO STORE YOUR BUFFERED CHANNEL MESSAGES
     buffer_t* buffer;
+    
 
     /* ADD ANY STRUCT ENTRIES YOU NEED HERE */
+    //all the mutexes, semaphores, condition variables, flag all in this struct
+    pthread_mutex_t mutex;//mtuex for the buffer - protect the buffer from concurrent access
+    pthread_cond_t cond_read; //condition variable for read operation - block a thread when it tries to read from a empty buffer
+    pthread_cond_t cond_write; // Condition variable for write operations - block a thread when it tries to writes to a full buffer
+    bool is_closed; // A flag indicating whether the channel is closed or not 
+
     /* IMPLEMENT THIS */
 } channel_t;
 

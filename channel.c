@@ -5,7 +5,26 @@
 channel_t* channel_create(size_t size)
 {
     /* IMPLEMENT THIS */
-    return NULL;
+    //send in term of messages  -> 1 send = 1 message
+
+    //unbuffered channel
+    if (size <= 0){
+        return NULL;
+    }
+
+    //1. Allocate memory for channel structure
+    channel_t* channel = (channel_t*)malloc(sizeof(channel_t));
+    //create a buffer of the specificed size
+    channel->buffer = buffer_create(size);
+    //Intialize the mutex
+    pthread_mutex_init(&channel->mutex, NULL);
+    //Intialize the condition variable for read operation
+    pthread_cond_init(&channel->cond_read, NULL);
+    //Intialize the condition variable for write operation
+    pthread_cond_init(&channel->cond_write, NULL);
+    channel->is_closed = false;//channel is set to open intially
+
+    return channel;
 }
 
 // Writes data to the given channel
@@ -53,6 +72,8 @@ enum channel_status channel_non_blocking_send(channel_t* channel, void* data)
 enum channel_status channel_non_blocking_receive(channel_t* channel, void** data)
 {
     /* IMPLEMENT THIS */
+
+    // receive wont block if there are no messages in the buffer and buffer is empty instead just say the buffer is empty
     return SUCCESS;
 }
 
@@ -64,6 +85,7 @@ enum channel_status channel_non_blocking_receive(channel_t* channel, void** data
 enum channel_status channel_close(channel_t* channel)
 {
     /* IMPLEMENT THIS */
+    //clears out everything that is happening in the channel  - any threads that are in middle of send or receive in that channel those will be stopped
     return SUCCESS;
 }
 
