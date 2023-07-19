@@ -66,6 +66,24 @@ enum channel_status channel_send(channel_t *channel, void* data)
 enum channel_status channel_receive(channel_t* channel, void** data)
 {
     /* IMPLEMENT THIS */
+
+    //lock the mutex
+    pthread_mutex_lock(&channel->mutex);
+
+    if (channel->is_closed) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CLOSED_ERROR;
+    }
+
+    //remove data from the buffer - check if the buffer is empty - if it is wait until data is added
+    while (buffer_remove(channel->buffer, data) == BUFFER_ERROR) {
+        //wait until the buffer is not emoty anymore - signaled by cond_write
+        pthread_cond_wait(&channel->cond_read, &channel->mutex);
+    }
+
+    pthread_cond_signal(&channel->cond_read); //signal that the buffer is not full anymore
+    pthread_mutex_unlock(&channel->mutex); //unlock the mutex
+
     return SUCCESS;
 }
 
