@@ -173,7 +173,7 @@ enum channel_status channel_close(channel_t* channel)
     if (channel->is_closed) {
         pthread_mutex_unlock(&channel->mutex);
         return CLOSED_ERROR;
-
+    }
     //mark channel as closed
     channel->is_closed = true;
 
