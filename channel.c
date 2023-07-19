@@ -77,11 +77,11 @@ enum channel_status channel_receive(channel_t* channel, void** data)
 
     //remove data from the buffer - check if the buffer is empty - if it is wait until data is added
     while (buffer_remove(channel->buffer, data) == BUFFER_ERROR) {
-        //wait until the buffer is not emoty anymore - signaled by cond_write
+        //wait until the buffer is not empty anymore - signaled by cond_write
         pthread_cond_wait(&channel->cond_read, &channel->mutex);
     }
 
-    pthread_cond_signal(&channel->cond_read); //signal that the buffer is not full anymore
+    pthread_cond_signal(&channel->cond_write); //signal that the buffer is not full anymore
     pthread_mutex_unlock(&channel->mutex); //unlock the mutex
 
     return SUCCESS;
@@ -96,6 +96,28 @@ enum channel_status channel_receive(channel_t* channel, void** data)
 enum channel_status channel_non_blocking_send(channel_t* channel, void* data)
 {
     /* IMPLEMENT THIS */
+    // if channel doesn't exist return GEN_ERROR
+    if(!channel){
+        return GEN_ERROR;
+    }
+
+    //lock the mutex
+    pthread_mutex_lock(&channel->mutex);
+
+    //check if channel is closed - unlock mutex, return closed_error
+    if (channel->is_closed) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CLOSED_ERROR;
+    }
+
+    if (buffer_add(channel->buffer, data) == BUFFER_ERROR) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CHANNEL_FULL;
+    }
+
+    pthread_cond_signal(&channel->cond_read); //signal that the buffer is not empty anymore
+    pthread_mutex_unlock(&channel->mutex); //unlock the mutex
+
     return SUCCESS;
 }
 
@@ -110,6 +132,27 @@ enum channel_status channel_non_blocking_receive(channel_t* channel, void** data
     /* IMPLEMENT THIS */
 
     // receive wont block if there are no messages in the buffer and buffer is empty instead just say the buffer is empty
+
+    if(!channel){
+        return GEN_ERROR;
+    }
+    //lock the mutex
+    pthread_mutex_lock(&channel->mutex);
+
+    if (channel->is_closed) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CLOSED_ERROR;
+    }
+
+
+    if (buffer_remove(channel->buffer, data) == BUFFER_ERROR) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CHANNEL_EMPTY;
+    }
+
+    pthread_cond_signal(&channel->cond_write); //signal that the buffer is not full anymore
+    pthread_mutex_unlock(&channel->mutex); //unlock the mutex
+
     return SUCCESS;
 }
 
