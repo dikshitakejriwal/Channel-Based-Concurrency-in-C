@@ -36,6 +36,24 @@ channel_t* channel_create(size_t size)
 enum channel_status channel_send(channel_t *channel, void* data)
 {
     /* IMPLEMENT THIS */
+    //lock the mutex
+    pthread_mutex_lock(&channel->mutex);
+
+    //check if channel is closed - unlock mutex, return closed_error
+    if (channel->is_closed) {
+        pthread_mutex_unlock(&channel->mutex);
+        return CLOSED_ERROR;
+    }
+
+    //else add in buffer and check if it full or not - if it throws an error then the buffer is full
+    while (buffer_add(channel->buffer, data) == BUFFER_ERROR){
+        //wait until the buffer is not full anymore - signaled by cond_read
+        pthread_cond_wait(&channel->cond_write, &channel->mutex);
+    }
+
+    pthread_cond_signal(&channel->cond_read); //signal that the buffer is not empty anymore
+    pthread_mutex_unlock(&channel->mutex); //unlock the mutex
+
     return SUCCESS;
 }
 
