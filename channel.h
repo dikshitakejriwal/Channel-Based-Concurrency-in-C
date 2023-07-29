@@ -35,6 +35,10 @@ typedef struct {
     pthread_cond_t cond_write; // Condition variable for write operations - block a thread when it tries to writes to a full buffer
     bool is_closed; // A flag indicating whether the channel is closed or not 
 
+    //condition variables and mutex for select
+    pthread_cond_t cond_select;
+    pthread_mutex_t mutex_select;
+
     /* IMPLEMENT THIS */
 } channel_t;
 
@@ -51,6 +55,7 @@ typedef struct {
     // If dir is RECV, then the message received from the channel is stored as an output in this parameter, data
     // If dir is SEND, then the message that needs to be sent is given as input in this parameter, data
     void* data;
+  
 } select_t;
 
 // Creates a new channel with the provided size and returns it to the caller

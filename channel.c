@@ -8,7 +8,7 @@ channel_t* channel_create(size_t size)
     //send in term of messages  -> 1 send = 1 message
 
     //unbuffered channel
-    if (size <= 0){
+    if (size == 0){
         return NULL;
     }
 
@@ -23,6 +23,10 @@ channel_t* channel_create(size_t size)
     //Intialize the condition variable for write operation
     pthread_cond_init(&channel->cond_write, NULL);
     channel->is_closed = false;//channel is set to open intially
+
+    //intialize condition variable and mutex for selection
+    pthread_cond_init(&channel->cond_select, NULL);
+    pthread_mutex_init(&channel->mutex_select, NULL);
 
     return channel;
 }
@@ -214,7 +218,6 @@ enum channel_status channel_destroy(channel_t* channel)
     pthread_mutex_destroy(&channel->mutex);
     pthread_cond_destroy(&channel->cond_read);
     pthread_cond_destroy(&channel->cond_write);
-
     free(channel);
 
     return SUCCESS;
@@ -229,6 +232,50 @@ enum channel_status channel_destroy(channel_t* channel)
 // Additionally, selected_index is set to the index of the channel that generated the error
 enum channel_status channel_select(select_t* channel_list, size_t channel_count, size_t* selected_index)
 {
-    /* IMPLEMENT THIS */
-    return SUCCESS;
+    if (!channel_list || channel_count == 0 || !selected_index) {
+        return GEN_ERROR;
+    }
+
+    //loop until we perform an operation
+    while (1){
+        for (size_t i = 0; i < channel_count; i++) {
+
+            channel_t* curr_channel = channel_list[i].channel;
+
+            //lock mutex
+            pthread_mutex_lock(&curr_channel->mutex);
+
+            //if channel is closed
+            if (curr_channel->is_closed) {
+                *selected_index = i;
+                pthread_mutex_unlock(&curr_channel->mutex);
+                return CLOSED_ERROR;
+            }
+
+            //checking the direction
+
+            if(channel_list[i].dir == SEND) {
+                if (buffer_add(curr_channel->buffer, channel_list[i].data) != BUFFER_ERROR) {
+                    *selected_index = i;
+                    pthread_cond_signal(&curr_channel->cond_read);
+                    pthread_mutex_unlock(&curr_channel->mutex);
+                    return SUCCESS;
+                }
+            } else { //RECV
+                if (buffer_remove(curr_channel->buffer, &(channel_list[i].data)) != BUFFER_ERROR) {
+                    *selected_index = i;
+                    pthread_cond_signal(&curr_channel->cond_write);
+                    pthread_mutex_unlock(&curr_channel->mutex);
+                    return SUCCESS;
+                }
+            }
+            // If no operation was performed, wait 
+            pthread_mutex_lock(&channel_list[0].channel->mutex_select);
+            pthread_cond_wait(&channel_list[0].channel->cond_select, &channel_list[0].channel->mutex_select);
+            pthread_mutex_unlock(&channel_list[0].channel->mutex_select);
+
+        }
+    }
+    
+    // return SUCCESS;
 }
