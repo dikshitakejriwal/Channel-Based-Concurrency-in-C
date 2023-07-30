@@ -236,46 +236,72 @@ enum channel_status channel_select(select_t* channel_list, size_t channel_count,
         return GEN_ERROR;
     }
 
-    //loop until we perform an operation
-    while (1){
-        for (size_t i = 0; i < channel_count; i++) {
+    //goes over each channel in the channel_list
+    for (size_t i = 0; i < channel_count; i++) {
+        channel_t* curr_channel = channel_list[i].channel;
 
-            channel_t* curr_channel = channel_list[i].channel;
+        //lock mutex
+        pthread_mutex_lock(&curr_channel->mutex);
 
-            //lock mutex
-            pthread_mutex_lock(&curr_channel->mutex);
-
-            //if channel is closed
-            if (curr_channel->is_closed) {
-                *selected_index = i;
-                pthread_mutex_unlock(&curr_channel->mutex);
-                return CLOSED_ERROR;
-            }
-
-            //checking the direction
-
-            if(channel_list[i].dir == SEND) {
-                if (buffer_add(curr_channel->buffer, channel_list[i].data) != BUFFER_ERROR) {
-                    *selected_index = i;
-                    pthread_cond_signal(&curr_channel->cond_read);
-                    pthread_mutex_unlock(&curr_channel->mutex);
-                    return SUCCESS;
-                }
-            } else { //RECV
-                if (buffer_remove(curr_channel->buffer, &(channel_list[i].data)) != BUFFER_ERROR) {
-                    *selected_index = i;
-                    pthread_cond_signal(&curr_channel->cond_write);
-                    pthread_mutex_unlock(&curr_channel->mutex);
-                    return SUCCESS;
-                }
-            }
-            // If no operation was performed, wait 
-            pthread_mutex_lock(&channel_list[0].channel->mutex_select);
-            pthread_cond_wait(&channel_list[0].channel->cond_select, &channel_list[0].channel->mutex_select);
-            pthread_mutex_unlock(&channel_list[0].channel->mutex_select);
-
+        //f channel is closed
+        if (curr_channel->is_closed) {
+            *selected_index = i;
+            pthread_mutex_unlock(&curr_channel->mutex);
+            return CLOSED_ERROR;
         }
+
+        //checking the direction
+        if (channel_list[i].dir == SEND) {
+            if (buffer_add(curr_channel->buffer, channel_list[i].data) != BUFFER_ERROR) {
+                *selected_index = i;
+                pthread_cond_signal(&curr_channel->cond_read);
+                pthread_mutex_unlock(&curr_channel->mutex);
+                return SUCCESS;
+            }
+        } else { // RECV
+            if (buffer_remove(curr_channel->buffer, &(channel_list[i].data)) != BUFFER_ERROR) {
+                *selected_index = i;
+                pthread_cond_signal(&curr_channel->cond_write);
+                pthread_mutex_unlock(&curr_channel->mutex);
+                return SUCCESS;
+            } 
+        }
+
+        pthread_mutex_unlock(&curr_channel->mutex);
     }
-    
-    // return SUCCESS;
+
+    // no operation was performed, wait for a signal indicating that a channel is ready.
+    size_t current_channel = 0;
+    while (1) {
+        channel_t* curr_channel = channel_list[current_channel].channel;
+        pthread_mutex_lock(&curr_channel->mutex);
+        
+        if (curr_channel->is_closed) {
+            *selected_index = current_channel;
+            pthread_mutex_unlock(&curr_channel->mutex);
+            return CLOSED_ERROR;
+        }
+
+        if (channel_list[current_channel].dir == SEND) {
+            if (buffer_add(curr_channel->buffer, channel_list[current_channel].data) != BUFFER_ERROR) {
+                *selected_index = current_channel;
+                pthread_cond_signal(&curr_channel->cond_read);
+                pthread_mutex_unlock(&curr_channel->mutex);
+                return SUCCESS;
+            }
+        } else { // RECV
+            if (buffer_remove(curr_channel->buffer, &(channel_list[current_channel].data)) != BUFFER_ERROR) {
+                *selected_index = current_channel;
+                pthread_cond_signal(&curr_channel->cond_write);
+                pthread_mutex_unlock(&curr_channel->mutex);
+                return SUCCESS;
+            }
+        }
+
+        pthread_mutex_unlock(&curr_channel->mutex);
+
+        // Move to the next channel
+        current_channel = (current_channel + 1) % channel_count;
+    }
 }
+
