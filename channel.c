@@ -27,6 +27,8 @@ channel_t* channel_create(size_t size)
     //intialize condition variable and mutex for selection
     pthread_cond_init(&channel->cond_select, NULL);
     pthread_mutex_init(&channel->mutex_select, NULL);
+    //create select list
+    channel->select_list = list_create();
 
     return channel;
 }
@@ -269,6 +271,7 @@ enum channel_status channel_select(select_t* channel_list, size_t channel_count,
 
         pthread_mutex_unlock(&curr_channel->mutex);
     }
+    
 
     // no operation was performed, wait for a signal indicating that a channel is ready.
     size_t current_channel = 0;
@@ -304,4 +307,10 @@ enum channel_status channel_select(select_t* channel_list, size_t channel_count,
         current_channel = (current_channel + 1) % channel_count;
     }
 }
+
+
+
+
+
+
 

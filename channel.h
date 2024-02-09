@@ -39,6 +39,8 @@ typedef struct {
     pthread_cond_t cond_select;
     pthread_mutex_t mutex_select;
 
+    list_t* select_list;
+
     /* IMPLEMENT THIS */
 } channel_t;
 
